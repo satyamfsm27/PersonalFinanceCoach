@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -67,40 +68,48 @@ def calculate_financial_plan(
     goal_months = float(goal_months)
     extra_monthly_saving = float(extra_monthly_saving)
 
+    # Monthly cash flow
     monthly_surplus = income - expenses
 
+    # Savings rate
     savings_rate = (
         (monthly_surplus / income) * 100
         if income > 0
         else 0
     )
 
+    # Goal gap
     goal_gap = max(
         financial_goal - current_savings,
         0
     )
 
+    # Required monthly saving
     required_monthly_saving = (
         goal_gap / goal_months
         if goal_months > 0
         else 0
     )
 
+    # Base saving from current cash flow
     base_monthly_saving = max(
         monthly_surplus,
         0
     )
 
+    # Planned saving including hypothetical extra amount
     planned_monthly_saving = (
         base_monthly_saving
         + max(extra_monthly_saving, 0)
     )
 
+    # Projected savings after target period
     projected_savings = (
         current_savings
         + planned_monthly_saving * goal_months
     )
 
+    # Months required to reach goal
     if goal_gap <= 0:
 
         months_to_goal = 0
@@ -115,6 +124,7 @@ def calculate_financial_plan(
 
         months_to_goal = None
 
+    # Goal status
     if goal_gap <= 0:
 
         goal_status = "Goal already achieved"
@@ -137,6 +147,7 @@ def calculate_financial_plan(
             "Additional monthly saving required"
         )
 
+    # Savings assessment
     if income <= 0:
 
         savings_assessment = (
@@ -167,6 +178,7 @@ def calculate_financial_plan(
             "20%+ savings rate"
         )
 
+    # Emergency fund
     emergency_fund_3_months = expenses * 3
     emergency_fund_6_months = expenses * 6
 
@@ -233,7 +245,10 @@ def calculate_financial_plan(
         ),
 
         "months_to_goal": (
-            round(months_to_goal, 2)
+            round(
+                months_to_goal,
+                2
+            )
             if months_to_goal is not None
             else None
         ),
@@ -276,95 +291,88 @@ SYSTEM_PROMPT = """
 
 You are an AI Personal Finance and Budgeting Coach.
 
-Your role is to help users understand personal cash flow,
-savings, budgeting, financial goals, emergency funds,
-and general financial concepts.
+Your role is to help users understand:
 
-IMPORTANT ARCHITECTURE RULE:
+- personal cash flow
+- budgeting
+- savings
+- financial goals
+- emergency funds
+- general financial concepts
 
-Python performs all financial calculations.
+IMPORTANT ARCHITECTURE:
 
-Python outputs are authoritative.
+Python is the financial calculation engine.
 
-Never manually recalculate, estimate, approximate,
-or contradict a number returned by Python.
+Python calculations are authoritative.
 
-If a calculation is required, use the verified Python
-calculation supplied by the application.
+Never manually calculate financial numbers when a Python
+result is provided.
 
-Use the exact numbers from the Python result.
+Never contradict a Python result.
 
-Do not invent financial numbers.
+Never invent financial numbers.
 
-Do not perform additional arithmetic after receiving
+Never perform additional arithmetic after receiving
 a Python result.
 
-If a number is not explicitly returned by Python,
-do not calculate it yourself.
-
-You may explain the meaning of verified numbers
-in simple language.
-
+Use the exact numbers returned by Python.
 
 --------------------------------------------------
-FINANCIAL GOALS
+GOALS AND SAVINGS
 --------------------------------------------------
 
 For questions involving:
 
-- monthly savings
 - monthly surplus
 - savings rate
-- financial goal feasibility
 - required monthly savings
 - projected savings
-- months required to reach a goal
+- goal feasibility
+- months to goal
 - what-if scenarios
 
-use the verified Python calculation.
+use the verified Python result.
 
-The Python field "months_to_goal" is the authoritative
-value for the time required to reach the goal.
+The Python field "months_to_goal" is authoritative.
 
-Do not calculate another value from it.
-
+Do not calculate another months-to-goal value yourself.
 
 --------------------------------------------------
 WHAT-IF SCENARIOS
 --------------------------------------------------
 
-Users may ask:
+When a user asks about a hypothetical change such as:
 
-"What if I save ₹5,000 more every month?"
+"What if I save an extra ₹5,000 every month?"
+
+"What if I save ₹10,000 more?"
 
 "What if my expenses decrease?"
 
 "What if my income increases?"
 
-These scenarios may be calculated by Python.
+the application may provide a separate Python-calculated
+scenario result.
 
-Clearly distinguish hypothetical scenarios
-from the user's current financial situation.
+Clearly identify the result as hypothetical.
 
-Never present hypothetical results as guaranteed outcomes.
+Use the exact scenario numbers supplied by Python.
 
+Do not recalculate them.
+
+Do not present hypothetical results as guaranteed outcomes.
 
 --------------------------------------------------
 EMERGENCY FUND
 --------------------------------------------------
 
-You may explain general emergency-fund concepts.
+Use the Python-calculated emergency fund values.
 
-Use the verified Python values for:
-
-- 3-month emergency fund
-- 6-month emergency fund
-
-Do not manually calculate these values.
-
+Do not manually calculate them.
 
 --------------------------------------------------
-GENERAL FINANCIAL EDUCATION
+GENERAL FINANCE EDUCATION
 --------------------------------------------------
 
 You may explain:
@@ -377,60 +385,55 @@ You may explain:
 - risk and return
 - inflation
 - compounding
-- financial planning
 - behavioural finance
+- financial planning
 - asset allocation at a general educational level
 
-Do not provide personalized instructions to buy or sell
-specific stocks, mutual funds, cryptocurrencies,
-insurance products, or other specific financial products.
+Do not recommend specific:
 
-Do not tell the user where they should invest their money.
+- stocks
+- mutual funds
+- cryptocurrencies
+- insurance products
+- financial products
+
+Do not tell the user exactly where to invest.
 
 Do not guarantee investment returns.
-
 
 --------------------------------------------------
 CONVERSATION
 --------------------------------------------------
 
-Maintain conversational context.
+Maintain conversation context.
 
-If the user's question is unclear or required information
-is missing, ask a concise follow-up question.
+Answer in simple language.
 
-Use simple language suitable for someone learning
-personal finance.
+If information is genuinely missing, ask a concise
+follow-up question.
 
-Be helpful and conversational rather than overly technical.
-
+When discussing calculated numbers, explain that they
+were verified by the Python financial engine.
 
 --------------------------------------------------
 SAFETY
 --------------------------------------------------
 
-This application is educational and informational.
+This is an educational finance assistant.
 
 Do not claim to be a licensed financial advisor.
 
-Do not guarantee outcomes.
-
-Do not make investment recommendations involving
-specific financial products.
-
+Do not guarantee financial outcomes.
 
 --------------------------------------------------
-IMPORTANT
+MOST IMPORTANT RULE
 --------------------------------------------------
 
-Never override or contradict Python calculations.
+Python is the single source of truth for calculations.
 
-Never perform hidden arithmetic yourself.
+Use Python's exact output.
 
-Never invent missing financial data.
-
-The verified Python result is the single source of truth
-for financial calculations.
+Do not perform hidden arithmetic.
 
 """
 
@@ -553,15 +556,21 @@ st.divider()
 
 
 # ============================================================
-# CURRENT FINANCIAL CALCULATION
+# BASE PYTHON CALCULATION
 # ============================================================
 
 result = calculate_financial_plan(
+
     income,
+
     expenses,
+
     current_savings,
+
     financial_goal,
+
     goal_months
+
 )
 
 
@@ -724,8 +733,8 @@ st.subheader(
 
 analysis_prompt = f"""
 
-Analyze the user's financial situation using ONLY the
-verified Python calculation below.
+Analyze the user's financial situation using ONLY
+the verified Python calculation below.
 
 User profile:
 
@@ -749,7 +758,7 @@ Explain:
 5. Emergency-fund position
 6. Practical budgeting considerations
 
-Use ONLY the values explicitly returned by Python.
+Use ONLY values explicitly returned by Python.
 
 Do not perform additional calculations.
 
@@ -778,6 +787,7 @@ try:
         ],
 
         temperature=0.2
+
     )
 
 
@@ -853,7 +863,9 @@ st.write(
 )
 
 
-# Display previous messages
+# ============================================================
+# DISPLAY PREVIOUS MESSAGES
+# ============================================================
 
 for message in st.session_state.agent_messages:
 
@@ -877,11 +889,17 @@ user_prompt = st.chat_input(
 
 if user_prompt:
 
+    # --------------------------------------------------------
+    # STORE USER MESSAGE
+    # --------------------------------------------------------
+
     st.session_state.agent_messages.append(
+
         {
             "role": "user",
             "content": user_prompt
         }
+
     )
 
 
@@ -892,9 +910,104 @@ if user_prompt:
         )
 
 
-    # ========================================================
-    # VERIFIED FINANCIAL CONTEXT
-    # ========================================================
+    # --------------------------------------------------------
+    # DETECT EXTRA MONTHLY SAVING
+    # --------------------------------------------------------
+
+    extra_monthly_saving = 0
+
+
+    # Pattern examples detected:
+    #
+    # "save an extra ₹5,000"
+    # "save extra 5000"
+    # "additional ₹10,000"
+    # "save an additional 10000"
+    #
+    extra_pattern = re.search(
+
+        r"(?:extra|additional)"
+        r"\s*"
+        r"(?:₹|rs\.?|inr)?"
+        r"\s*"
+        r"([\d,]+(?:\.\d+)?)",
+
+        user_prompt.lower()
+
+    )
+
+
+    # Also support:
+    #
+    # "save ₹5,000 more"
+    # "save 5000 more"
+    #
+    more_pattern = re.search(
+
+        r"(?:save|saving|savings)"
+        r".{0,20}?"
+        r"(?:₹|rs\.?|inr)?"
+        r"\s*"
+        r"([\d,]+(?:\.\d+)?)"
+        r"\s*(?:more|extra)",
+
+        user_prompt.lower()
+
+    )
+
+
+    if extra_pattern:
+
+        extra_monthly_saving = float(
+
+            extra_pattern
+            .group(1)
+            .replace(",", "")
+
+        )
+
+
+    elif more_pattern:
+
+        extra_monthly_saving = float(
+
+            more_pattern
+            .group(1)
+            .replace(",", "")
+
+        )
+
+
+    # --------------------------------------------------------
+    # RUN PYTHON FOR WHAT-IF SCENARIO
+    # --------------------------------------------------------
+
+    if extra_monthly_saving > 0:
+
+        scenario_result = calculate_financial_plan(
+
+            income=income,
+
+            expenses=expenses,
+
+            current_savings=current_savings,
+
+            financial_goal=financial_goal,
+
+            goal_months=goal_months,
+
+            extra_monthly_saving=extra_monthly_saving
+
+        )
+
+    else:
+
+        scenario_result = result
+
+
+    # --------------------------------------------------------
+    # BUILD VERIFIED FINANCIAL CONTEXT
+    # --------------------------------------------------------
 
     financial_context = f"""
 
@@ -918,16 +1031,57 @@ Goal timeline:
 Risk preference:
 {risk_preference}
 
-VERIFIED PYTHON CALCULATION:
+
+BASELINE PYTHON CALCULATION:
 
 {json.dumps(result, indent=2)}
 
 """
 
 
-    # ========================================================
-    # COMPLETE CONVERSATION
-    # ========================================================
+    # --------------------------------------------------------
+    # ADD WHAT-IF PYTHON RESULT
+    # --------------------------------------------------------
+
+    if extra_monthly_saving > 0:
+
+        financial_context += f"""
+
+============================================================
+WHAT-IF SCENARIO
+============================================================
+
+The user asked about adding an extra:
+
+₹{extra_monthly_saving:,.2f}
+
+per month.
+
+Python has calculated the hypothetical scenario.
+
+VERIFIED PYTHON SCENARIO RESULT:
+
+{json.dumps(scenario_result, indent=2)}
+
+
+IMPORTANT:
+
+This scenario result is authoritative.
+
+Use the exact values above.
+
+Do not perform additional arithmetic.
+
+Do not calculate another months-to-goal value.
+
+Clearly state that this is a hypothetical scenario.
+
+"""
+
+
+    # --------------------------------------------------------
+    # PREPARE CONVERSATION
+    # --------------------------------------------------------
 
     messages = [
 
@@ -954,9 +1108,9 @@ VERIFIED PYTHON CALCULATION:
     )
 
 
-    # ========================================================
-    # AI RESPONSE
-    # ========================================================
+    # --------------------------------------------------------
+    # GENERATE AI RESPONSE
+    # --------------------------------------------------------
 
     with st.chat_message("assistant"):
 
@@ -973,14 +1127,17 @@ VERIFIED PYTHON CALCULATION:
                     messages=messages,
 
                     temperature=0.2
+
                 )
 
 
                 assistant_response = (
+
                     response
                     .choices[0]
                     .message
                     .content
+
                 )
 
 
@@ -999,11 +1156,21 @@ VERIFIED PYTHON CALCULATION:
                 )
 
 
+                # Save scenario result
+                if extra_monthly_saving > 0:
+
+                    st.session_state.last_tool_result = (
+                        scenario_result
+                    )
+
+
             except Exception as e:
 
                 st.error(
+
                     "Unable to connect to the AI service.\n\n"
                     f"Error: {str(e)}"
+
                 )
 
 
