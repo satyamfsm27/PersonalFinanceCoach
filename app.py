@@ -22,19 +22,20 @@ st.set_page_config(
 
 load_dotenv()
 
-API_KEY = os.getenv("GEMINI_API_KEY")
+API_KEY = os.getenv("GROQ_API_KEY")
 
-# Streamlit Cloud Secrets
 if not API_KEY:
     try:
-        API_KEY = st.secrets["GEMINI_API_KEY"]
+        API_KEY = st.secrets["GROQ_API_KEY"]
     except Exception:
         API_KEY = None
 
-if not API_KEY:
-    st.error("GEMINI_API_KEY not found.")
-    st.stop()
+MODEL = "openai/gpt-oss-20b"
 
+client = OpenAI(
+    api_key=API_KEY,
+    base_url="https://api.groq.com/openai/v1"
+)
 
 # ============================================================
 # GEMINI CLIENT
